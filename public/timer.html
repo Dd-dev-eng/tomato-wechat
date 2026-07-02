@@ -49,19 +49,17 @@
   /* 按钮 */
   .btn-row { display: flex; gap: 12px; justify-content: center; }
   .btn {
-    border: none; border-radius: 28px; padding: 14px 0; width: 140px;
+    border: none; border-radius: 28px; padding: 14px 0; width: 100%;
     font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;
   }
   .btn:active { transform: scale(0.96); }
   .btn-start { background: #07c160; color: #fff; }
-  .btn-pause { background: #ffc107; color: #1a1a2e; }
-  .btn-reset {
-    background: transparent; color: #888;
-    border: 1.5px solid #444;
+  .btn-end {
+    background: transparent; color: #e64340;
+    border: 2px solid #e64340;
   }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* 完成弹窗 */
+  /* 弹窗 */
   .overlay { display: none; }
   .overlay.show { display: flex; }
   .overlay {
@@ -77,7 +75,12 @@
   .dialog .emoji { font-size: 48px; margin-bottom: 12px; }
   .dialog h2 { font-size: 20px; color: #07c160; margin-bottom: 12px; }
   .dialog p { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.6; }
+  .dialog .btn-row { flex-direction: column; gap: 10px; }
   .dialog .btn { width: 100%; }
+  .dialog .btn-ghost {
+    background: transparent; color: #888;
+    border: 1.5px solid #444;
+  }
 
   /* 设置表单（无参数时显示） */
   .setup { display: none; }
@@ -90,7 +93,7 @@
     border-radius: 10px; background: #2a2a3e; color: #eee; font-size: 16px; outline: none;
   }
   .field input:focus { border-color: #07c160; }
-  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .preset {
     padding: 8px 16px; border-radius: 20px; border: 1.5px solid #333;
     background: transparent; color: #aaa; font-size: 13px; cursor: pointer;
@@ -121,7 +124,7 @@
       </div>
       <input id="durInput" type="number" placeholder="自定义分钟数" value="25" min="1" max="180">
     </div>
-    <button class="btn btn-start" style="width:100%" onclick="startFromSetup()">开始专注 🎯</button>
+    <button class="btn btn-start" onclick="startFromSetup()">开始专注 🎯</button>
   </div>
 
   <!-- 计时界面 -->
@@ -145,15 +148,14 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-pause" id="btnPause" onclick="togglePause()">暂停</button>
-      <button class="btn btn-reset" onclick="resetTimer()">重置</button>
+      <button class="btn btn-end" id="btnEnd" onclick="handleEnd()">结束</button>
     </div>
   </div>
 
 </div>
 
 <!-- 完成弹窗 -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlayDone">
   <div class="dialog">
     <div class="emoji">🍅</div>
     <h2>时间到！</h2>
@@ -162,13 +164,27 @@
   </div>
 </div>
 
+<!-- 提前结束确认弹窗 -->
+<div class="overlay" id="overlayConfirm">
+  <div class="dialog">
+    <div class="emoji">⏹</div>
+    <h2>提前结束？</h2>
+    <p id="confirmMsg">确定要提前结束吗？</p>
+    <div class="btn-row">
+      <button class="btn btn-end" onclick="confirmEnd()">确认结束</button>
+      <button class="btn btn-ghost" onclick="cancelEnd()">继续专注</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const CIRCUMFERENCE = 2 * Math.PI * 54; // ≈ 339.292
+const CIRCUMFERENCE = 2 * Math.PI * 54;
 let totalSeconds = 0;
 let remaining = 0;
 let timerId = null;
 let isPaused = false;
 let audioCtx = null;
+let activityEnded = false; // 防止重复结束
 
 // DOM
 const setup = document.getElementById('setup');
@@ -178,9 +194,42 @@ const timerEl = document.getElementById('timer');
 const ring = document.getElementById('ring');
 const elapsedEl = document.getElementById('elapsed');
 const totalEl = document.getElementById('total');
-const btnPause = document.getElementById('btnPause');
-const overlay = document.getElementById('overlay');
+const btnEnd = document.getElementById('btnEnd');
+const overlayDone = document.getElementById('overlayDone');
+const overlayConfirm = document.getElementById('overlayConfirm');
 const doneMsg = document.getElementById('doneMsg');
+const confirmMsg = document.getElementById('confirmMsg');
+
+// --- URL 参数 ---
+const params = new URLSearchParams(window.location.search);
+const urlName = params.get('name');
+const urlDur = params.get('duration');
+const urlOpenid = params.get('openid');
+
+// --- 服务器 API ---
+const API_BASE = '';
+
+async function apiStart(name, duration) {
+  if (!urlOpenid) return;
+  try {
+    await fetch(API_BASE + '/api/activity/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ openid: urlOpenid, name, duration })
+    });
+  } catch(e) { console.log('apiStart 失败:', e); }
+}
+
+async function apiEnd() {
+  if (!urlOpenid) return;
+  try {
+    await fetch(API_BASE + '/api/activity/end', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ openid: urlOpenid })
+    });
+  } catch(e) { console.log('apiEnd 失败:', e); }
+}
 
 // --- 设置界面 ---
 document.getElementById('presets').addEventListener('click', e => {
@@ -194,6 +243,7 @@ document.getElementById('presets').addEventListener('click', e => {
 function startFromSetup() {
   const name = document.getElementById('actInput').value.trim() || '专注';
   const dur = parseInt(document.getElementById('durInput').value) || 25;
+  apiStart(name, dur);
   startTimer(name, dur);
 }
 
@@ -202,14 +252,15 @@ function startTimer(name, durationMin) {
   totalSeconds = durationMin * 60;
   remaining = totalSeconds;
   isPaused = false;
+  activityEnded = false;
 
   actName.textContent = name;
   totalEl.textContent = '共 ' + durationMin + ' 分钟';
 
   setup.classList.remove('show');
   timerUI.style.display = 'block';
-  btnPause.textContent = '暂停';
-  btnPause.className = 'btn btn-pause';
+  btnEnd.textContent = '结束';
+  btnEnd.className = 'btn btn-end';
 
   ring.style.strokeDasharray = CIRCUMFERENCE;
   ring.style.strokeDashoffset = '0';
@@ -219,12 +270,14 @@ function startTimer(name, durationMin) {
   updateDisplay();
   clearInterval(timerId);
   timerId = setInterval(tick, 1000);
+  saveState();
 }
 
 function tick() {
   if (isPaused) return;
   remaining--;
   updateDisplay();
+  saveState();
   if (remaining <= 0) done();
 }
 
@@ -244,44 +297,76 @@ function updateDisplay() {
   }
 }
 
-function togglePause() {
-  isPaused = !isPaused;
-  btnPause.textContent = isPaused ? '继续' : '暂停';
-  btnPause.className = isPaused ? 'btn btn-start' : 'btn btn-pause';
+// --- 结束按钮 ---
+function handleEnd() {
+  if (remaining <= 0) return; // 已经结束了
+  if (activityEnded) return;  // 防止重复点击
+
+  // 用实际经过的时间（而非剩余时间）来计算已过分钟数
+  const elapsed = totalSeconds - remaining;
+  const elapsedMin = Math.floor(elapsed / 60);
+  const totalMin = Math.floor(totalSeconds / 60);
+
+  confirmMsg.textContent = '已完成 ' + elapsedMin + ' 分钟，计划 ' + totalMin + ' 分钟。确定要提前结束吗？';
+  overlayConfirm.classList.add('show');
 }
 
-function resetTimer() {
+function confirmEnd() {
+  overlayConfirm.classList.remove('show');
+  activityEnded = true;
   clearInterval(timerId);
   timerId = null;
-  timerUI.style.display = 'none';
-  setup.classList.add('show');
-  overlay.classList.remove('show');
-}
-
-function done() {
-  clearInterval(timerId);
-  timerId = null;
-  timerEl.textContent = '00:00';
-  timerEl.classList.add('warning');
-  doneMsg.textContent = '你完成了【' + actName.textContent + '】的专注！';
-  overlay.classList.add('show');
+  // 通知服务器
+  apiEnd();
+  // 显示完成弹窗
+  const elapsed = totalSeconds - Math.max(0, remaining);
+  const elapsedMin = Math.floor(elapsed / 60);
+  doneMsg.textContent = '你提前结束了【' + actName.textContent + '】，实际专注 ' + elapsedMin + ' 分钟';
+  document.querySelector('#overlayDone .emoji').textContent = '🍳';
+  document.querySelector('#overlayDone h2').textContent = '已结束';
+  overlayDone.classList.add('show');
   playSound();
 }
 
+function cancelEnd() {
+  overlayConfirm.classList.remove('show');
+}
+
+// --- 自然完成 ---
+function done() {
+  clearInterval(timerId);
+  timerId = null;
+  activityEnded = true;
+  timerEl.textContent = '00:00';
+  timerEl.classList.add('warning');
+  // 通知服务器
+  apiEnd();
+  // 显示弹窗
+  doneMsg.textContent = '你完成了【' + actName.textContent + '】的专注！';
+  document.querySelector('#overlayDone .emoji').textContent = '🍅';
+  document.querySelector('#overlayDone h2').textContent = '时间到！';
+  overlayDone.classList.add('show');
+  playSound();
+  clearState();
+}
+
 function closeOverlay() {
-  overlay.classList.remove('show');
-  resetTimer();
+  overlayDone.classList.remove('show');
+  // 回到设置界面
+  timerUI.style.display = 'none';
+  setup.classList.add('show');
 }
 
 // --- 持久化 ---
 const STORAGE_KEY = 'tomato_timer';
 function saveState() {
+  if (remaining <= 0) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     name: actName.textContent,
     totalSeconds,
     remaining,
     startTime: Date.now() - (totalSeconds - remaining) * 1000,
-    isPaused
+    openid: urlOpenid || ''
   }));
 }
 function clearState() { localStorage.removeItem(STORAGE_KEY); }
@@ -303,58 +388,45 @@ function playSound() {
   } catch(e) {}
 }
 
-// --- 改写 tick 加入持久化 ---
-const origTick = tick;
-tick = function() {
-  if (isPaused) return;
-  remaining--;
+// --- 恢复计时（从指定剩余秒数开始） ---
+function startTimerFrom(name, durationMin, startRemaining, savedOpenid) {
+  totalSeconds = durationMin * 60;
+  remaining = startRemaining;
+  isPaused = false;
+  activityEnded = false;
+
+  actName.textContent = name;
+  totalEl.textContent = '共 ' + durationMin + ' 分钟';
+  setup.classList.remove('show');
+  timerUI.style.display = 'block';
+  btnEnd.textContent = '结束';
+  btnEnd.className = 'btn btn-end';
+  ring.style.strokeDasharray = CIRCUMFERENCE;
+  ring.style.stroke = remaining <= 60 ? '#e64340' : '#07c160';
+  if (remaining <= 60) timerEl.classList.add('warning');
   updateDisplay();
-  saveState();
-  if (remaining <= 0) done();
-};
+  clearInterval(timerId);
+  timerId = setInterval(tick, 1000);
+  // 恢复时不重复调用 apiStart（微信侧已经记录过了）
+}
 
-// --- 改写 done 清除持久化 ---
-const origDone = done;
-done = function() {
-  clearState();
-  origDone();
-};
-
-// --- 改写 resetTimer 清除持久化 ---
-const origReset = resetTimer;
-resetTimer = function() {
-  clearState();
-  origReset();
-};
-
-// --- 改写 togglePause 持久化 ---
-const origToggle = togglePause;
-togglePause = function() {
-  origToggle();
-  saveState();
-};
-
-// --- 初始化：检查 URL 参数 或 持久化状态 ---
-const params = new URLSearchParams(window.location.search);
-const urlName = params.get('name');
-const urlDur = params.get('duration');
-
+// --- 初始化 ---
 if (urlName && urlDur) {
   // URL 有参数：检查是否已有相同参数的计时器在运行
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved && saved.name === urlName && saved.totalSeconds === parseInt(urlDur) * 60) {
-    // 同一个计时器，恢复继续
     const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
-    const remaining = Math.max(0, saved.totalSeconds - elapsed);
-    if (remaining > 0) {
-      startTimerFrom(saved.name, parseInt(urlDur), remaining, saved.isPaused);
+    const remain = Math.max(0, saved.totalSeconds - elapsed);
+    if (remain > 0) {
+      startTimerFrom(saved.name, parseInt(urlDur), remain, saved.openid);
     } else {
       clearState();
       setup.classList.add('show');
     }
   } else {
-    // 新计时器
+    // 新计时器：通知服务器开始
     clearState();
+    apiStart(urlName, parseInt(urlDur));
     startTimer(urlName, parseInt(urlDur));
   }
 } else {
@@ -362,11 +434,9 @@ if (urlName && urlDur) {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved && saved.remaining > 0) {
     const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
-    const remaining = Math.max(0, saved.totalSeconds - elapsed);
-    if (remaining > 0) {
-      // 恢复计时
-      totalSeconds = saved.totalSeconds;
-      startTimerFrom(saved.name, totalSeconds / 60, remaining, saved.isPaused);
+    const remain = Math.max(0, saved.totalSeconds - elapsed);
+    if (remain > 0) {
+      startTimerFrom(saved.name, saved.totalSeconds / 60, remain, saved.openid);
     } else {
       clearState();
       setup.classList.add('show');
@@ -374,27 +444,6 @@ if (urlName && urlDur) {
   } else {
     setup.classList.add('show');
   }
-}
-
-// 恢复计时（从指定剩余秒数开始）
-function startTimerFrom(name, durationMin, startRemaining, paused) {
-  totalSeconds = durationMin * 60;
-  remaining = startRemaining;
-  isPaused = paused;
-
-  actName.textContent = name;
-  totalEl.textContent = '共 ' + durationMin + ' 分钟';
-  setup.classList.remove('show');
-  timerUI.style.display = 'block';
-  btnPause.textContent = paused ? '继续' : '暂停';
-  btnPause.className = paused ? 'btn btn-start' : 'btn btn-pause';
-  ring.style.strokeDasharray = CIRCUMFERENCE;
-  ring.style.stroke = remaining <= 60 ? '#e64340' : '#07c160';
-  if (remaining <= 60) timerEl.classList.add('warning');
-  updateDisplay();
-  clearInterval(timerId);
-  timerId = setInterval(tick, 1000);
-  saveState();
 }
 </script>
 

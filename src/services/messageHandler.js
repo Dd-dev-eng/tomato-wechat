@@ -113,7 +113,7 @@ class MessageHandler {
     }
     const activity = activityService.start(openid, name, dur);
     const base = process.env.SITE_URL || 'http://localhost:3000';
-    const link = `${base}/timer?name=${encodeURIComponent(name)}&duration=${dur}`;
+    const link = `${base}/timer?name=${encodeURIComponent(name)}&duration=${dur}&openid=${openid}`;
 
     // 调度到时间提醒
     scheduleReminder(openid, name, dur);
@@ -131,12 +131,27 @@ class MessageHandler {
   }
 
   showRecord(openid, accountId) {
-    return textReply(openid, accountId,
-      '📊 今日记录\n' +
-      '━━━━━━━━━━━\n' +
-      '功能开发中，敬请期待～\n\n' +
-      '发送「开始」开启番茄钟 🍅'
-    );
+    const list = activityService.getTodayActivities(openid);
+    if (list.length === 0) {
+      return textReply(openid, accountId,
+        '📊 今日记录\n' +
+        '━━━━━━━━━━━\n' +
+        '今天还没有完成记录\n\n' +
+        '发送「开始」开启番茄钟 🍅'
+      );
+    }
+    let totalMin = 0;
+    let msg = '📊 今日记录\n' + '━━━━━━━━━━━\n';
+    list.forEach(a => {
+      const actual = Math.round(((a.endTime || Date.now()) - a.startTime) / 60000);
+      totalMin += actual;
+      const done = actual >= a.plannedDuration;
+      msg += `${done ? '🍅' : '🍳'} ${a.name} — ${actual} 分钟\n`;
+    });
+    msg += '━━━━━━━━━━━\n' +
+      `🎯 共 ${list.length} 次 | ${totalMin} 分钟\n\n` +
+      '继续保持！';
+    return textReply(openid, accountId, msg);
   }
 
   welcome(openid, accountId) {
@@ -213,7 +228,7 @@ class MessageHandler {
     scheduleReminder(openid, session.tempActivityName, dur);
 
     const base = process.env.SITE_URL || 'http://localhost:3000';
-    const link = `${base}/timer?name=${encodeURIComponent(activity.name)}&duration=${dur}`;
+    const link = `${base}/timer?name=${encodeURIComponent(activity.name)}&duration=${dur}&openid=${openid}`;
 
     return textReply(openid, accountId,
       '🍅 番茄钟已开始！\n' +
@@ -258,3 +273,4 @@ class MessageHandler {
 }
 
 module.exports = new MessageHandler();
+module.exports.cancelReminder = cancelReminder;

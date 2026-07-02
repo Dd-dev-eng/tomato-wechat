@@ -68,6 +68,9 @@ app.get('/wechat', (req, res) => {
 // ========== 微信消息 ==========
 const bodyParser = require('body-parser');
 const messageHandler = require('./services/messageHandler');
+const activityService = require('./services/activityService');
+
+app.use(express.json()); // 解析 JSON body
 
 function parseXML(xml) {
   const result = {};
@@ -92,6 +95,53 @@ app.post('/wechat', bodyParser.text({ type: ['text/xml', 'text/plain'], limit: '
     }
   }
 );
+
+// ========== H5 活动记录 API ==========
+// 开始活动（H5 页面调用）
+app.post('/api/activity/start', (req, res) => {
+  const { openid, name, duration } = req.body;
+  if (!openid || !name || !duration) {
+    return res.status(400).json({ ok: false, error: '缺少参数 openid/name/duration' });
+  }
+  const existing = activityService.getOngoing(openid);
+  if (existing) {
+    return res.json({ ok: true, activity: existing, note: '已有进行中的活动' });
+  }
+  const activity = activityService.start(openid, name, duration);
+  console.log('H5 开始活动:', openid, name, duration);
+  res.json({ ok: true, activity });
+});
+
+// 结束活动（H5 页面调用）
+app.post('/api/activity/end', (req, res) => {
+  const { openid } = req.body;
+  if (!openid) {
+    return res.status(400).json({ ok: false, error: '缺少 openid' });
+  }
+  // 取消服务端提醒
+  messageHandler.cancelReminder(openid);
+  const activity = activityService.end(openid);
+  if (!activity) {
+    return res.json({ ok: false, error: '没有进行中的活动' });
+  }
+  const actual = Math.round((activity.endTime - activity.startTime) / 60000);
+  console.log('H5 结束活动:', openid, activity.name, actual, '分钟');
+  res.json({ ok: true, activity: { ...activity, actualMinutes: actual } });
+});
+
+// 获取今日记录（H5 页面调用）
+app.get('/api/activities/:openid', (req, res) => {
+  const { openid } = req.params;
+  const list = activityService.getTodayActivities(openid);
+  const result = list.map(a => ({
+    name: a.name,
+    plannedDuration: a.plannedDuration,
+    actualMinutes: Math.round(((a.endTime || Date.now()) - a.startTime) / 60000),
+    completed: a.status === 'completed',
+    time: new Date(a.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }));
+  res.json({ ok: true, activities: result, total: result.length });
+});
 
 // ========== 微信菜单创建 ==========
 const axios = require('axios');

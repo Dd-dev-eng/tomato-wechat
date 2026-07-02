@@ -24,6 +24,20 @@ class ActivityService {
     ongoing.delete(openid);
     return activity;
   }
+
+  // 获取今日已完成的活动记录
+  getTodayActivities(openid) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.getTime();
+    const result = [];
+    for (const [, a] of activities) {
+      if (a.openid === openid && a.status === 'completed' && a.startTime >= todayStart) {
+        result.push(a);
+      }
+    }
+    return result.sort((a, b) => b.startTime - a.startTime);
+  }
 }
 
 module.exports = new ActivityService();
