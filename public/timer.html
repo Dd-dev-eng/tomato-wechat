@@ -273,6 +273,19 @@ function closeOverlay() {
   resetTimer();
 }
 
+// --- 持久化 ---
+const STORAGE_KEY = 'tomato_timer';
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    name: actName.textContent,
+    totalSeconds,
+    remaining,
+    startTime: Date.now() - (totalSeconds - remaining) * 1000,
+    isPaused
+  }));
+}
+function clearState() { localStorage.removeItem(STORAGE_KEY); }
+
 // --- 提示音 ---
 function playSound() {
   try {
@@ -290,15 +303,84 @@ function playSound() {
   } catch(e) {}
 }
 
-// --- 初始化：检查 URL 参数 ---
+// --- 改写 tick 加入持久化 ---
+const origTick = tick;
+tick = function() {
+  if (isPaused) return;
+  remaining--;
+  updateDisplay();
+  saveState();
+  if (remaining <= 0) done();
+};
+
+// --- 改写 done 清除持久化 ---
+const origDone = done;
+done = function() {
+  clearState();
+  origDone();
+};
+
+// --- 改写 resetTimer 清除持久化 ---
+const origReset = resetTimer;
+resetTimer = function() {
+  clearState();
+  origReset();
+};
+
+// --- 改写 togglePause 持久化 ---
+const origToggle = togglePause;
+togglePause = function() {
+  origToggle();
+  saveState();
+};
+
+// --- 初始化：检查 URL 参数 或 持久化状态 ---
 const params = new URLSearchParams(window.location.search);
 const urlName = params.get('name');
 const urlDur = params.get('duration');
 
 if (urlName && urlDur) {
+  // URL 有参数：新启动（清除旧状态）
+  clearState();
   startTimer(urlName, parseInt(urlDur));
 } else {
-  setup.classList.add('show');
+  // 无参数：检查是否有进行中的计时器
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  if (saved && saved.remaining > 0) {
+    const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
+    const remaining = Math.max(0, saved.totalSeconds - elapsed);
+    if (remaining > 0) {
+      // 恢复计时
+      totalSeconds = saved.totalSeconds;
+      startTimerFrom(saved.name, totalSeconds / 60, remaining, saved.isPaused);
+    } else {
+      clearState();
+      setup.classList.add('show');
+    }
+  } else {
+    setup.classList.add('show');
+  }
+}
+
+// 恢复计时（从指定剩余秒数开始）
+function startTimerFrom(name, durationMin, startRemaining, paused) {
+  totalSeconds = durationMin * 60;
+  remaining = startRemaining;
+  isPaused = paused;
+
+  actName.textContent = name;
+  totalEl.textContent = '共 ' + durationMin + ' 分钟';
+  setup.classList.remove('show');
+  timerUI.style.display = 'block';
+  btnPause.textContent = paused ? '继续' : '暂停';
+  btnPause.className = paused ? 'btn btn-start' : 'btn btn-pause';
+  ring.style.strokeDasharray = CIRCUMFERENCE;
+  ring.style.stroke = remaining <= 60 ? '#e64340' : '#07c160';
+  if (remaining <= 60) timerEl.classList.add('warning');
+  updateDisplay();
+  clearInterval(timerId);
+  timerId = setInterval(tick, 1000);
+  saveState();
 }
 </script>
 

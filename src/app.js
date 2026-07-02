@@ -93,11 +93,68 @@ app.post('/wechat', bodyParser.text({ type: ['text/xml', 'text/plain'], limit: '
   }
 );
 
+// ========== 微信菜单创建 ==========
+const axios = require('axios');
+
+async function getAccessToken() {
+  const { data } = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
+    params: {
+      grant_type: 'client_credential',
+      appid: process.env.WECHAT_APPID,
+      secret: process.env.WECHAT_APPSECRET
+    }
+  });
+  return data.access_token;
+}
+
+async function createMenu() {
+  try {
+    if (!process.env.WECHAT_APPID || !process.env.WECHAT_APPSECRET) {
+      return console.log('菜单: APPID/APPSECRET 未设置，跳过');
+    }
+    const token = await getAccessToken();
+    const menu = {
+      button: [
+        {
+          name: '🍅 开始',
+          sub_button: [
+            { type: 'click', name: '📖 阅读 25分钟', key: 'QUICK_READ' },
+            { type: 'click', name: '📚 学习 25分钟', key: 'QUICK_STUDY' },
+            { type: 'click', name: '🏃 运动 25分钟', key: 'QUICK_SPORT' },
+            { type: 'click', name: '💼 工作 25分钟', key: 'QUICK_WORK' },
+            { type: 'click', name: '✏️ 自定义...', key: 'MENU_CUSTOM' }
+          ]
+        },
+        {
+          name: '⏹ 结束',
+          type: 'click',
+          key: 'MENU_END'
+        },
+        {
+          name: '📊 更多',
+          sub_button: [
+            { type: 'click', name: '📋 今日记录', key: 'MENU_RECORD' },
+            { type: 'click', name: '❓ 帮助', key: 'MENU_HELP' }
+          ]
+        }
+      ]
+    };
+    await axios.post(
+      `https://api.weixin.qq.com/cgi-bin/menu/create?access_token=${token}`,
+      menu
+    );
+    console.log('微信菜单创建成功');
+  } catch (e) {
+    console.error('菜单创建失败:', e.response?.data?.errmsg || e.message);
+  }
+}
+
 // ========== 启动 ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log('=== 主动番茄已启动 ===');
   console.log('PORT:', PORT);
   console.log('WECHAT_TOKEN:', process.env.WECHAT_TOKEN ? '已设置 (' + process.env.WECHAT_TOKEN.length + '字符)' : '未设置');
   console.log('SITE_URL:', process.env.SITE_URL || '未设置');
+  await createMenu();
 });
