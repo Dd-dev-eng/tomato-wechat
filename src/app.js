@@ -184,7 +184,7 @@ async function createMenu() {
           name: '📊 更多',
           sub_button: [
             { type: 'click', name: '📋 今日记录', key: 'MENU_RECORD' },
-            { type: 'click', name: '❓ 帮助', key: 'MENU_HELP' }
+            { type: 'click', name: '🕐 时钟', key: 'MENU_CLOCK' }
           ]
         }
       ]

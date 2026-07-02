@@ -94,7 +94,7 @@ class MessageHandler {
       case 'MENU_CUSTOM':  return this.cmdStart(openid, accountId);
       case 'MENU_END':     return this.cmdEnd(openid, accountId);
       case 'MENU_RECORD':  return this.showRecord(openid, accountId);
-      case 'MENU_HELP':    return this.welcome(openid, accountId);
+      case 'MENU_CLOCK':   return this.showClock(openid, accountId);
       default:             return this.welcome(openid, accountId);
     }
   }
@@ -113,7 +113,7 @@ class MessageHandler {
     }
     const activity = activityService.start(openid, name, dur);
     const base = process.env.SITE_URL || 'http://localhost:3000';
-    const link = `${base}/timer?name=${encodeURIComponent(name)}&duration=${dur}&openid=${openid}`;
+    const link = `${base}/timer?name=${encodeURIComponent(name)}&duration=${dur}&startTime=${activity.startTime}&openid=${openid}`;
 
     // 调度到时间提醒
     scheduleReminder(openid, name, dur);
@@ -161,7 +161,33 @@ class MessageHandler {
       '专注当下，高效工作\n\n' +
       '👉 点击底部菜单快速开始\n' +
       '👉 发送「开始」自定义活动\n' +
+      '👉 点击「时钟」查看当前计时\n' +
       '👉 完成后回复「结束」记录时长'
+    );
+  }
+
+  showClock(openid, accountId) {
+    const ongoing = activityService.getOngoing(openid);
+    if (!ongoing) {
+      return textReply(openid, accountId,
+        '🕐 时钟\n' +
+        '━━━━━━━━━━━\n' +
+        '没有进行中的活动\n\n' +
+        '发送「开始」开启番茄钟 🍅'
+      );
+    }
+    const base = process.env.SITE_URL || 'http://localhost:3000';
+    const elapsed = Math.round((Date.now() - ongoing.startTime) / 60000);
+    const remain = Math.max(0, ongoing.plannedDuration - elapsed);
+    const link = `${base}/timer?name=${encodeURIComponent(ongoing.name)}&duration=${ongoing.plannedDuration}&startTime=${ongoing.startTime}&openid=${openid}`;
+    return textReply(openid, accountId,
+      '🕐 当前时钟\n' +
+      '━━━━━━━━━━━\n' +
+      `📌 ${ongoing.name}\n` +
+      `⏰ 计划：${ongoing.plannedDuration} 分钟\n` +
+      `⏱ 已过：${elapsed} 分钟\n` +
+      `⏳ 剩余：${remain} 分钟\n\n` +
+      `📱 点击查看：\n${link}`
     );
   }
 
@@ -242,7 +268,7 @@ class MessageHandler {
     scheduleReminder(openid, session.tempActivityName, dur);
 
     const base = process.env.SITE_URL || 'http://localhost:3000';
-    const link = `${base}/timer?name=${encodeURIComponent(activity.name)}&duration=${dur}&openid=${openid}`;
+    const link = `${base}/timer?name=${encodeURIComponent(activity.name)}&duration=${dur}&startTime=${activity.startTime}&openid=${openid}`;
 
     return textReply(openid, accountId,
       '🍅 番茄钟已开始！\n' +
