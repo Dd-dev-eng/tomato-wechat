@@ -109,6 +109,8 @@ app.post('/api/activity/start', (req, res) => {
     return res.json({ ok: true, activity: existing, note: '已有进行中的活动' });
   }
   const activity = activityService.start(openid, name, duration);
+  // H5 启动时也调度微信提醒
+  messageHandler.scheduleReminder(openid, name, duration);
   console.log('H5 开始活动:', openid, name, duration);
   res.json({ ok: true, activity });
 });
@@ -142,6 +144,13 @@ app.get('/api/activities/:openid', (req, res) => {
     time: new Date(a.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }));
   res.json({ ok: true, activities: result, total: result.length });
+});
+
+// 查询当前进行中活动（H5 页面初始化用）
+app.get('/api/ongoing/:openid', (req, res) => {
+  const { openid } = req.params;
+  const ongoing = activityService.getOngoing(openid);
+  res.json({ ok: true, ongoing: ongoing || null });
 });
 
 // ========== 时钟直达（微信 OAuth 静默授权） ==========

@@ -207,14 +207,15 @@ const urlStartTime = params.get('startTime'); // 服务端时间戳
 const API_BASE = '';
 
 async function apiStart(name, duration) {
-  if (!urlOpenid) return;
+  if (!urlOpenid) return null;
   try {
-    await fetch(API_BASE + '/api/activity/start', {
+    const res = await fetch(API_BASE + '/api/activity/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ openid: urlOpenid, name, duration })
     });
-  } catch(e) {}
+    return await res.json();
+  } catch(e) { return null; }
 }
 
 async function apiEnd() {
@@ -237,11 +238,27 @@ document.getElementById('presets').addEventListener('click', e => {
   }
 });
 
-function startFromSetup() {
+async function startFromSetup() {
   const name = document.getElementById('actInput').value.trim() || '专注';
   const dur = parseInt(document.getElementById('durInput').value) || 25;
-  apiStart(name, dur);
-  startTimer(name, dur);
+  const result = await apiStart(name, dur);
+  if (result && result.ok && result.activity) {
+    const a = result.activity;
+    if (result.note) {
+      // 已有进行中的活动 → 跳转到当前计时器
+      const link = '?name=' + encodeURIComponent(a.name) + '&duration=' + a.plannedDuration + '&startTime=' + a.startTime + '&openid=' + urlOpenid;
+      window.location.replace(link);
+      return;
+    }
+    // 新活动已创建 → 更新 URL 为规范格式（和聊天链接一致）
+    serverStartTime = a.startTime;
+    const newSearch = '?name=' + encodeURIComponent(name) + '&duration=' + dur + '&startTime=' + a.startTime + '&openid=' + urlOpenid;
+    window.history.replaceState(null, '', newSearch);
+    startTimer(name, dur, a.startTime);
+  } else {
+    // API 不可用，本地启动
+    startTimer(name, dur);
+  }
 }
 
 // --- 计时核心 ---
@@ -488,6 +505,20 @@ function startTimerFrom(name, durationMin, startRemaining, savedServerTs) {
   saveState();
 }
 
+// 异步检查服务端是否有进行中活动（H5 独立打开时）
+async function checkServerOngoing() {
+  if (!urlOpenid) return;
+  try {
+    const res = await fetch('/api/ongoing/' + urlOpenid);
+    const data = await res.json();
+    if (data.ok && data.ongoing) {
+      const o = data.ongoing;
+      const link = '?name=' + encodeURIComponent(o.name) + '&duration=' + o.plannedDuration + '&startTime=' + o.startTime + '&openid=' + urlOpenid;
+      window.location.replace(link);
+    }
+  } catch(e) {}
+}
+
 // ========== 初始化 ==========
 if (urlName && urlDur && urlStartTime) {
   // 有服务端时间戳：无论何时打开，始终根据服务端时间计算正确状态
@@ -529,19 +560,20 @@ if (urlName && urlDur && urlStartTime) {
     startTimer(urlName, durMin);
   }
 } else {
-  // 无参数：检查 localStorage 或显示设置界面
+  // 无活动参数：检查 localStorage
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved) {
     const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
     const remain = Math.max(0, saved.totalSeconds - elapsed);
     if (saved.isOvertime || remain <= 0) {
-      // 超时状态：显示已完成
       showAlreadyDone(saved.name, saved.totalSeconds / 60);
     } else if (remain > 0) {
       startTimerFrom(saved.name, saved.totalSeconds / 60, remain, saved.serverStartTime);
     }
   } else {
     setup.classList.add('show');
+    // 如果有 openid（从时钟按钮进入），异步检查服务端是否有进行中活动
+    checkServerOngoing();
   }
 }
 </script>
