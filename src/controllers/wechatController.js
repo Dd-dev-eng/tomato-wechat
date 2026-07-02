@@ -17,33 +17,47 @@ class WechatController {
     const { signature, timestamp, nonce, echostr } = req.query;
     const token = wechatConfig.token;
 
-    console.log('微信验证请求:', { signature, timestamp, nonce, echostr: echostr ? echostr.substring(0, 20) : '', token });
+    console.log('=== 微信验证请求 ===');
+    console.log('query 参数:', req.query);
+    console.log('token:', token, '(类型:', typeof token, ')');
 
     if (!token) {
-      console.error('WECHAT_TOKEN 未设置！当前值:', token);
+      console.error('WECHAT_TOKEN 未设置！');
+      res.type('text/plain');
+      return res.send('');
+    }
+
+    if (!signature || !timestamp || !nonce || !echostr) {
+      console.error('缺少必要参数:', { signature: !!signature, timestamp: !!timestamp, nonce: !!nonce, echostr: !!echostr });
+      res.type('text/plain');
       return res.send('');
     }
 
     const arr = [token, timestamp, nonce].sort();
     const str = arr.join('');
+    console.log('排序后拼接:', str);
+
     const sha1 = crypto.createHash('sha1');
-    sha1.update(str);
+    sha1.update(str, 'utf-8');
     const hashCode = sha1.digest('hex');
 
-    console.log('验证结果:', { hashCode, signature, match: hashCode === signature });
+    console.log('计算结果:', hashCode);
+    console.log('微信签名:', signature);
+    console.log('匹配结果:', hashCode === signature);
 
     if (hashCode === signature) {
-      console.log('验证成功，返回:', echostr);
+      console.log('验证成功！返回 echostr');
+      res.type('text/plain');
       res.send(echostr);
     } else {
-      console.log('验证失败');
+      console.log('验证失败：hash 不匹配');
+      res.type('text/plain');
       res.send('');
     }
   }
 
   async handleMessage(req, res) {
     try {
-      // body-parser 已经把 XML 解析到 req.body 了
       const xmlData = req.body;
       if (!xmlData) {
         console.error('收到空的请求体');

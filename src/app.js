@@ -1,8 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const { connectDB } = require('./config/database');
 const wechatController = require('./controllers/wechatController');
+const wechatConfig = require('./config/wechat');
 const reminderService = require('./services/reminderService');
 const wechatService = require('./services/wechatService');
 const activityService = require('./services/activityService');
@@ -49,6 +51,20 @@ app.get('/api/timer/status', async (req, res) => {
 });
 
 // --- 微信 ---
+
+// 调试端点：查看当前微信配置状态
+app.get('/wechat-debug', (req, res) => {
+  const token = wechatConfig.token;
+  res.json({
+    hasAppId: !!wechatConfig.appId,
+    hasAppSecret: !!wechatConfig.appSecret,
+    token: token || '(未设置)',
+    tokenType: typeof token,
+    allEnvKeys: Object.keys(process.env).filter(k => k.startsWith('WECHAT') || k === 'SITE_URL' || k === 'PORT'),
+    nodeEnv: process.env.NODE_ENV,
+    serverTime: new Date().toISOString()
+  });
+});
 
 // GET 请求处理（微信服务器验证）
 app.get('/wechat', (req, res) => {
