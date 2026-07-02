@@ -314,3 +314,4 @@ class MessageHandler {
 module.exports = new MessageHandler();
 module.exports.cancelReminder = cancelReminder;
 module.exports.scheduleReminder = scheduleReminder;
+module.exports.sendCustomerMsg = sendCustomerMsg;

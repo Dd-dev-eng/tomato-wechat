@@ -128,7 +128,24 @@ app.post('/api/activity/end', (req, res) => {
     return res.json({ ok: false, error: '没有进行中的活动' });
   }
   const actual = Math.round((activity.endTime - activity.startTime) / 60000);
+  const done = actual >= activity.plannedDuration;
+  const icon = done ? '🍅' : '🍳';
+  const label = done ? '完美番茄' : '半熟番茄';
+  const note = done ? '' : `\n（未达计划时长，下次加油！）`;
+
   console.log('H5 结束活动:', openid, activity.name, actual, '分钟');
+
+  // 发送微信消息到聊天框（与 cmdEnd 格式一致）
+  messageHandler.sendCustomerMsg(openid,
+    '✅ 完成！\n' +
+    '━━━━━━━━━━━\n' +
+    `📌 活动：${activity.name}\n` +
+    `⏰ 计划：${activity.plannedDuration} 分钟\n` +
+    `⏱ 实际：${actual} 分钟\n` +
+    `${icon}  ${label}${note}\n\n` +
+    '干得漂亮！发送「开始」继续～'
+  );
+
   res.json({ ok: true, activity: { ...activity, actualMinutes: actual } });
 });
 
