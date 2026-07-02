@@ -1,44 +1,19 @@
-const { stores } = require('../config/database');
-const { v4: uuidv4 } = require('uuid');
+// 内存存储，MVP 可接受重启丢失
+const sessions = new Map();
 
 class SessionService {
-  async getSession(openid) {
-    let session = stores.sessions.findOne(openid);
-    if (!session) {
-      session = this.createDefault(openid);
+  async get(openid) {
+    if (!sessions.has(openid)) {
+      sessions.set(openid, { openid, step: 'idle', tempActivityName: null });
     }
-    return session;
+    return sessions.get(openid);
   }
 
-  createDefault(openid) {
-    return stores.sessions.saveDoc(openid, {
-      openid,
-      step: 'idle',
-      tempActivityName: null,
-      tempPlannedDuration: null,
-      updatedAt: new Date().toISOString()
-    });
-  }
-
-  async updateSession(openid, updates) {
-    const session = await this.getSession(openid);
-    return stores.sessions.saveDoc(openid, { ...session, ...updates });
-  }
-
-  async clearTemp(openid) {
-    return this.updateSession(openid, {
-      step: 'idle',
-      tempActivityName: null,
-      tempPlannedDuration: null
-    });
-  }
-
-  async resetSession(openid) {
-    return this.updateSession(openid, {
-      step: 'idle',
-      tempActivityName: null,
-      tempPlannedDuration: null
-    });
+  async update(openid, data) {
+    const current = await this.get(openid);
+    const merged = { ...current, ...data };
+    sessions.set(openid, merged);
+    return merged;
   }
 }
 

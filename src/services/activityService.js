@@ -1,54 +1,28 @@
-const { stores } = require('../config/database');
-const { v4: uuidv4 } = require('uuid');
+// 内存存储，MVP 可接受重启丢失
+const activities = new Map();   // id -> activity
+const ongoing = new Map();      // openid -> activityId
 
 class ActivityService {
-  async startActivity(openid, name, plannedDuration) {
-    const id = uuidv4();
-    return stores.activities.saveDoc(id, {
-      _id: id,
-      openid,
-      name,
-      plannedDuration,
-      startTime: new Date().toISOString(),
-      endTime: null,
-      status: 'ongoing',
-      tomatoType: null,
-      actualDuration: null,
-      isTimeUpReminderSent: false,
-      isTimeoutReminderSent: false,
-      createdAt: new Date().toISOString()
-    });
+  start(openid, name, plannedDuration) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const activity = { id, openid, name, plannedDuration, startTime: Date.now(), endTime: null, status: 'ongoing' };
+    activities.set(id, activity);
+    ongoing.set(openid, id);
+    return activity;
   }
 
-  async getOngoingActivity(openid) {
-    const all = stores.activities.findAll(a => a.openid === openid && a.status === 'ongoing');
-    return all[0] || null;
+  getOngoing(openid) {
+    const id = ongoing.get(openid);
+    return id ? activities.get(id) : null;
   }
 
-  async endActivity(openid, isEarlyEnd) {
-    const activity = await this.getOngoingActivity(openid);
+  end(openid) {
+    const activity = this.getOngoing(openid);
     if (!activity) return null;
-
-    const now = new Date();
-    const startTime = new Date(activity.startTime);
-    const actualDuration = Math.round((now - startTime) / (1000 * 60));
-    const tomatoType = isEarlyEnd ? 'half-ripe' : 'perfect';
-
-    return stores.activities.saveDoc(activity._id, {
-      ...activity,
-      endTime: now.toISOString(),
-      status: 'completed',
-      actualDuration,
-      tomatoType
-    });
-  }
-
-  async getTodayActivities(openid) {
-    const today = new Date().toISOString().split('T')[0];
-    return stores.activities.findAll(a => 
-      a.openid === openid && 
-      a.createdAt && a.createdAt.startsWith(today)
-    );
+    activity.endTime = Date.now();
+    activity.status = 'completed';
+    ongoing.delete(openid);
+    return activity;
   }
 }
 
