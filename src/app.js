@@ -155,8 +155,8 @@ app.get('/clock', (req, res) => {
     if (ongoing) {
       return res.redirect(`${siteUrl}/timer?name=${encodeURIComponent(ongoing.name)}&duration=${ongoing.plannedDuration}&startTime=${ongoing.startTime}&openid=${openid}`);
     }
-    // 无进行中活动，返回提示页
-    return res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>主动番茄</title><style>body{font-family:-apple-system,sans-serif;background:#1a1a2e;color:#eee;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;text-align:center}.msg{font-size:20px;color:#07c160;margin-bottom:12px}.sub{font-size:14px;color:#888}</style></head><body><div><div class="msg">🕐 没有进行中的活动</div><div class="sub">在聊天框发送「开始」来开启番茄钟</div></div></body></html>`);
+    // 无进行中活动，统一跳转到计时器页面（显示设置表单）
+    return res.redirect(`${siteUrl}/timer?openid=${openid}`);
   }
 
   // 无 openid → 发起 OAuth 静默授权
