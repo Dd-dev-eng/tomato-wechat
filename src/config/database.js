@@ -1,22 +1,19 @@
-const mongoose = require('mongoose');
+// 使用 JSON 文件存储，无需外部数据库
+const { JsonStore } = require('./jsonStore');
+
+const stores = {
+  users: new JsonStore('users'),
+  activities: new JsonStore('activities'),
+  activityPools: new JsonStore('activityPools'),
+  sessions: new JsonStore('sessions')
+};
 
 const connectDB = async () => {
-  try {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
-      console.error('MONGODB_URI 环境变量未设置！');
-      process.exit(1);
-    }
-    await mongoose.connect(uri);
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
-  }
+  console.log('✅ JSON 文件存储已就绪');
 };
 
 const disconnectDB = async () => {
-  await mongoose.disconnect();
+  console.log('存储已关闭');
 };
 
-module.exports = { connectDB, disconnectDB };
+module.exports = { connectDB, disconnectDB, stores };

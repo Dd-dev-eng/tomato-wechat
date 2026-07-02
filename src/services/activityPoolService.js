@@ -1,46 +1,24 @@
-const DailyActivityPool = require('../models/DailyActivityPool');
-const { getTodayDateString } = require('../utils/dateHelper');
+const { stores } = require('../config/database');
+const { v4: uuidv4 } = require('uuid');
 
 class ActivityPoolService {
   async getTodayPool(openid) {
-    const date = getTodayDateString();
-    let pool = await DailyActivityPool.findOne({ openid, date });
+    // 默认活动池
+    const key = `pool_${openid}`;
+    let pool = stores.activityPools.findOne(key);
     if (!pool) {
-      pool = await DailyActivityPool.create({
+      pool = stores.activityPools.saveDoc(key, {
         openid,
-        date,
-        activities: []
+        date: new Date().toISOString().split('T')[0],
+        activities: ['阅读', '学习', '运动']
       });
     }
     return pool;
   }
 
-  async addActivity(openid, activityName) {
-    const date = getTodayDateString();
-    const pool = await DailyActivityPool.findOneAndUpdate(
-      { openid, date },
-      { $addToSet: { activities: activityName } },
-      { new: true, upsert: true }
-    );
-    return pool;
-  }
-
-  async removeActivity(openid, activityName) {
-    const date = getTodayDateString();
-    return await DailyActivityPool.findOneAndUpdate(
-      { openid, date },
-      { $pull: { activities: activityName } },
-      { new: true }
-    );
-  }
-
-  async setActivities(openid, activities) {
-    const date = getTodayDateString();
-    return await DailyActivityPool.findOneAndUpdate(
-      { openid, date },
-      { activities },
-      { new: true, upsert: true }
-    );
+  async getActivities(openid) {
+    const pool = await this.getTodayPool(openid);
+    return pool.activities;
   }
 }
 
