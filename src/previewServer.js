@@ -64,7 +64,7 @@ app.get('/api/status', async (req, res) => {
     if (state.activity) {
       const activity = state.activity;
       const now = new Date();
-      const plannedEndTime = new Date(activity.startTime.getTime() + activity.plannedDuration * 60 * 1000);
+      const plannedEndTime = new Date(new Date(activity.startTime).getTime() + activity.plannedDuration * 60 * 1000);
       const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
       // 检查是否需要发送时间到提醒
@@ -77,7 +77,7 @@ app.get('/api/status', async (req, res) => {
       }
 
       // 检查是否需要发送超时提醒（30分钟后）
-      if (activity.startTime.getTime() <= thirtyMinutesAgo.getTime() && !pendingReminders.has(`timeout_${activity._id}`)) {
+      if (new Date(activity.startTime).getTime() <= thirtyMinutesAgo.getTime() && !pendingReminders.has(`timeout_${activity._id}`)) {
         // 确保只在已经发送过时间到提醒之后才发送超时提醒
         if (pendingReminders.has(`timeup_${activity._id}`)) {
           reminders.push({
@@ -213,7 +213,7 @@ function buildHomeActions() {
 async function startActivityFlow(prefixText = '') {
   const ongoing = await activityService.getOngoingActivity(PREVIEW_OPENID);
   if (ongoing) {
-    const elapsed = Math.round((Date.now() - ongoing.startTime) / (1000 * 60));
+    const elapsed = Math.round((Date.now() - new Date(ongoing.startTime)) / (1000 * 60));
     return replyWithActions(
       `当前正在进行【${ongoing.name}】，已进行 ${elapsed} 分钟。\n\n如需结束，点击下方「开始/结束」。`,
       []
@@ -297,7 +297,7 @@ async function endActivityFlow() {
   }
 
   const now = new Date();
-  const plannedEndTime = new Date(activity.startTime.getTime() + activity.plannedDuration * 60 * 1000);
+  const plannedEndTime = new Date(new Date(activity.startTime).getTime() + activity.plannedDuration * 60 * 1000);
 
   if (now < plannedEndTime) {
     await sessionService.updateSession(PREVIEW_OPENID, { step: 'confirming_early_end' });
@@ -379,7 +379,7 @@ async function showTodayRecord() {
   let perfectCount = 0, halfRipeCount = 0, totalMinutes = 0;
 
   activities.slice().reverse().forEach(activity => {
-    const startTime = activity.startTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const startTime = new Date(activity.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     const emoji = activity.tomatoType === 'perfect' ? '🍅' : (activity.tomatoType === 'half-ripe' ? '🍳' : '');
     if (activity.tomatoType === 'perfect') perfectCount++;
     if (activity.tomatoType === 'half-ripe') halfRipeCount++;
@@ -411,8 +411,8 @@ async function getPreviewState() {
       _id: ongoing._id.toString(),
       name: ongoing.name,
       plannedDuration: ongoing.plannedDuration,
-      startTime: ongoing.startTime.toISOString(),
-      elapsed: Math.round((Date.now() - ongoing.startTime) / (1000 * 60))
+      startTime: ongoing.startTime,
+      elapsed: Math.round((Date.now() - new Date(ongoing.startTime)) / (1000 * 60))
     } : null
   };
 }

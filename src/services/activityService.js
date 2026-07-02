@@ -2,17 +2,20 @@ const { stores } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
 class ActivityService {
-  async createActivity(openid, data) {
+  async startActivity(openid, name, plannedDuration) {
     const id = uuidv4();
     return stores.activities.saveDoc(id, {
       _id: id,
       openid,
-      name: data.name,
-      plannedDuration: data.plannedDuration,
-      startTime: data.startTime || new Date(),
+      name,
+      plannedDuration,
+      startTime: new Date().toISOString(),
       endTime: null,
       status: 'ongoing',
       tomatoType: null,
+      actualDuration: null,
+      isTimeUpReminderSent: false,
+      isTimeoutReminderSent: false,
       createdAt: new Date().toISOString()
     });
   }
@@ -22,13 +25,20 @@ class ActivityService {
     return all[0] || null;
   }
 
-  async endActivity(activityId, tomatoType) {
-    const activity = stores.activities.findOne(activityId);
+  async endActivity(openid, isEarlyEnd) {
+    const activity = await this.getOngoingActivity(openid);
     if (!activity) return null;
-    return stores.activities.saveDoc(activityId, {
+
+    const now = new Date();
+    const startTime = new Date(activity.startTime);
+    const actualDuration = Math.round((now - startTime) / (1000 * 60));
+    const tomatoType = isEarlyEnd ? 'half-ripe' : 'perfect';
+
+    return stores.activities.saveDoc(activity._id, {
       ...activity,
-      endTime: new Date(),
+      endTime: now.toISOString(),
       status: 'completed',
+      actualDuration,
       tomatoType
     });
   }

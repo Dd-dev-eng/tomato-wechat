@@ -37,8 +37,8 @@ app.get('/api/timer/status', async (req, res) => {
         ongoing: true,
         name: ongoing.name,
         plannedDuration: ongoing.plannedDuration,
-        startTime: ongoing.startTime.toISOString(),
-        elapsed: Math.round((Date.now() - ongoing.startTime) / (1000 * 60))
+        startTime: ongoing.startTime,
+        elapsed: Math.round((Date.now() - new Date(ongoing.startTime)) / (1000 * 60))
       });
     } else {
       res.json({ ongoing: false });
@@ -119,7 +119,7 @@ const startServer = async () => {
     reminderService.start();
 
     // 菜单：活动 | 开始/结束 | 倒计时（子菜单含倒计时+记录）
-    const baseUrl = process.env.SITE_URL || 'https://tomato-wechat-production.up.railway.app';
+    const baseUrl = process.env.SITE_URL || 'https://tomato-wechat-production-8db0.up.railway.app';
     const menuConfig = {
       button: [
         { name: '活动', type: 'click', key: 'START_ACTIVITY' },

@@ -109,7 +109,7 @@ class MessageHandler {
   async startActivityFlow(openid, toUser, fromUser) {
     const ongoing = await activityService.getOngoingActivity(openid);
     if (ongoing) {
-      const elapsed = Math.round((new Date() - ongoing.startTime) / (1000 * 60));
+      const elapsed = Math.round((new Date() - new Date(ongoing.startTime)) / (1000 * 60));
       return wechatService.generateTextReply(toUser, fromUser, 
         `当前正在进行【${ongoing.name}】，已进行 ${elapsed} 分钟。\n\n发送「结束」结束当前活动。`);
     }
@@ -167,7 +167,7 @@ class MessageHandler {
     }
 
     const now = new Date();
-    const plannedEndTime = new Date(activity.startTime.getTime() + activity.plannedDuration * 60 * 1000);
+    const plannedEndTime = new Date(new Date(activity.startTime).getTime() + activity.plannedDuration * 60 * 1000);
 
     if (now < plannedEndTime) {
       await sessionService.updateSession(openid, { step: 'confirming_early_end' });
@@ -236,7 +236,7 @@ class MessageHandler {
     let totalMinutes = 0;
 
     activities.slice().reverse().forEach(activity => {
-      const startTime = activity.startTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      const startTime = new Date(activity.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       const tomatoEmoji = activity.tomatoType === 'perfect' ? '🍅' : (activity.tomatoType === 'half-ripe' ? '🍳' : '');
       if (activity.tomatoType === 'perfect') perfectCount++;
       if (activity.tomatoType === 'half-ripe') halfRipeCount++;

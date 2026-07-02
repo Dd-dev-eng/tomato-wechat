@@ -6,7 +6,7 @@ class UserService {
     if (!user) {
       user = stores.users.saveDoc(openid, {
         openid,
-        subscribed: true,
+        isSubscribed: true,
         createdAt: new Date().toISOString()
       });
     }
@@ -15,6 +15,12 @@ class UserService {
 
   async getUser(openid) {
     return stores.users.findOne(openid);
+  }
+
+  async updateUserSubscription(openid, isSubscribed) {
+    const user = await this.getUser(openid);
+    if (!user) return null;
+    return stores.users.saveDoc(openid, { ...user, isSubscribed });
   }
 }
 

@@ -32,6 +32,14 @@ class SessionService {
       tempPlannedDuration: null
     });
   }
+
+  async resetSession(openid) {
+    return this.updateSession(openid, {
+      step: 'idle',
+      tempActivityName: null,
+      tempPlannedDuration: null
+    });
+  }
 }
 
 module.exports = new SessionService();
