@@ -13,9 +13,16 @@ const parseXML = (xml) => {
 };
 
 class WechatController {
-  async verify(req, res) {
+  verify(req, res) {
     const { signature, timestamp, nonce, echostr } = req.query;
     const token = wechatConfig.token;
+
+    console.log('微信验证请求:', { signature, timestamp, nonce, echostr: echostr ? echostr.substring(0, 20) : '', token });
+
+    if (!token) {
+      console.error('WECHAT_TOKEN 未设置！当前值:', token);
+      return res.send('');
+    }
 
     const arr = [token, timestamp, nonce].sort();
     const str = arr.join('');
@@ -23,9 +30,13 @@ class WechatController {
     sha1.update(str);
     const hashCode = sha1.digest('hex');
 
+    console.log('验证结果:', { hashCode, signature, match: hashCode === signature });
+
     if (hashCode === signature) {
+      console.log('验证成功，返回:', echostr);
       res.send(echostr);
     } else {
+      console.log('验证失败');
       res.send('');
     }
   }
