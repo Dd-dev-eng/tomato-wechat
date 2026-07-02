@@ -581,6 +581,24 @@ async function checkIfStillOngoingThenShowDone(name, durMin, serverTs) {
   }
 }
 
+async function checkServerThenRestore(name, durMin, serverTs, saved) {
+  try {
+    const res = await fetch('/api/ongoing/' + urlOpenid);
+    const data = await res.json();
+    if (data.ok && data.ongoing && data.ongoing.startTime === serverTs) {
+      // 服务端确认活动仍在进行中，从 localStorage 恢复
+      startTimerFrom(name, durMin, saved.remaining, serverTs, saved.timerStartTime);
+    } else {
+      // 活动已被聊天框结束 → 清除旧状态，回到设置表单
+      clearState();
+      window.location.replace('?openid=' + urlOpenid);
+    }
+  } catch(e) {
+    // 网络错误时，信任 localStorage 恢复
+    startTimerFrom(name, durMin, saved.remaining, serverTs, saved.timerStartTime);
+  }
+}
+
 // ========== 初始化 ==========
 if (urlName && urlDur && urlStartTime) {
   // 有服务端时间戳：无论何时打开，始终根据服务端时间计算正确状态
@@ -601,7 +619,12 @@ if (urlName && urlDur && urlStartTime) {
     // 还在进行中 → 检查 localStorage 恢复或重新开始
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && saved.serverStartTime === serverTs && saved.name === urlName && saved.remaining > 0) {
-      startTimerFrom(urlName, durMin, saved.remaining, serverTs, saved.timerStartTime);
+      // localStorage 有匹配状态 → 需确认服务端活动未被聊天框结束
+      if (urlOpenid) {
+        checkServerThenRestore(urlName, durMin, serverTs, saved);
+      } else {
+        startTimerFrom(urlName, durMin, saved.remaining, serverTs, saved.timerStartTime);
+      }
     } else {
       clearState();
       // 服务端校验：防止活动已结束后重新打开链接导致计时重启
