@@ -541,6 +541,23 @@ async function checkServerOngoing() {
   } catch(e) {}
 }
 
+async function checkServerStatusAndStart(name, durMin, serverTs, remain) {
+  try {
+    const res = await fetch('/api/ongoing/' + urlOpenid);
+    const data = await res.json();
+    if (data.ok && data.ongoing && data.ongoing.startTime === serverTs) {
+      // 服务端确认活动仍在进行中，正常开始计时
+      startTimer(name, durMin, serverTs, remain);
+    } else {
+      // 服务端活动已结束（或被其他活动覆盖），显示已完成
+      showAlreadyDone(name, durMin);
+    }
+  } catch(e) {
+    // 网络错误时，保守处理：显示已完成状态
+    showAlreadyDone(name, durMin);
+  }
+}
+
 // ========== 初始化 ==========
 if (urlName && urlDur && urlStartTime) {
   // 有服务端时间戳：无论何时打开，始终根据服务端时间计算正确状态
@@ -560,7 +577,13 @@ if (urlName && urlDur && urlStartTime) {
       startTimerFrom(urlName, durMin, saved.remaining, serverTs, saved.timerStartTime);
     } else {
       clearState();
-      startTimer(urlName, durMin, serverTs, remain);
+      // 服务端校验：防止活动已结束后重新打开链接导致计时重启
+      if (urlOpenid) {
+        checkServerStatusAndStart(urlName, durMin, serverTs, remain);
+      } else {
+        // 无 openid 时无法校验，信任 localStorage 已清除（用户已结束）
+        showAlreadyDone(urlName, durMin);
+      }
     }
   }
 } else if (urlName && urlDur) {
