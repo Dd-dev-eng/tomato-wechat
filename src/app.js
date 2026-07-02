@@ -14,6 +14,9 @@ app.use((req, res, next) => {
 
 // H5 倒计时页面
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.get('/timer', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'timer.html'));
+});
 
 // 首页
 app.get('/', (req, res) => {
