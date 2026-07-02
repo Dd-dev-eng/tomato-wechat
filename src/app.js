@@ -100,8 +100,8 @@ const startServer = async () => {
   try {
     await connectDB();
     
-    app.listen(PORT, () => {
-      console.log(`服务器运行在端口 ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`服务器运行在 0.0.0.0:${PORT}`);
     });
 
     reminderService.start();
