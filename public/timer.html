@@ -655,15 +655,25 @@ if (urlName && urlDur && urlStartTime) {
     startTimer(urlName, durMin);
   }
 } else {
-  // 无活动参数：检查 localStorage
+  // 无活动参数：检查 localStorage（需确认服务端活动未被聊天框结束）
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (saved) {
     const elapsed = Math.floor((Date.now() - (saved.timerStartTime || 0)) / 1000);
     const remain = Math.max(0, saved.totalSeconds - elapsed);
     if (saved.isOvertime || remain <= 0) {
-      showAlreadyDone(saved.name, saved.totalSeconds / 60);
+      // 时间已过 → 检查服务端状态
+      if (urlOpenid && saved.serverStartTime) {
+        checkIfStillOngoingThenShowDone(saved.name, saved.totalSeconds / 60, saved.serverStartTime);
+      } else {
+        showAlreadyDone(saved.name, saved.totalSeconds / 60);
+      }
     } else if (remain > 0) {
-      startTimerFrom(saved.name, saved.totalSeconds / 60, remain, saved.serverStartTime, saved.timerStartTime);
+      // 还有剩余时间 → 确认服务端活动仍在进行中再恢复
+      if (urlOpenid && saved.serverStartTime) {
+        checkServerThenRestore(saved.name, saved.totalSeconds / 60, saved.serverStartTime, saved);
+      } else {
+        startTimerFrom(saved.name, saved.totalSeconds / 60, remain, saved.serverStartTime, saved.timerStartTime);
+      }
     }
   } else {
     setup.classList.add('show');
