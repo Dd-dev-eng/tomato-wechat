@@ -97,10 +97,23 @@ process.on('unhandledRejection', (reason) => {
 // --- 启动 ---
 const startServer = async () => {
   try {
+    console.log('环境信息:', {
+      PORT: process.env.PORT,
+      NODE_ENV: process.env.NODE_ENV,
+      SITE_URL: process.env.SITE_URL,
+      WECHAT_APPID: process.env.WECHAT_APPID ? '已设置' : '未设置',
+      WECHAT_APPSECRET: process.env.WECHAT_APPSECRET ? '已设置' : '未设置',
+      WECHAT_TOKEN: process.env.WECHAT_TOKEN
+    });
+    
     await connectDB();
     
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`服务器运行在 0.0.0.0:${PORT}`);
+    });
+
+    server.on('error', (err) => {
+      console.error('服务器错误:', err);
     });
 
     reminderService.start();
