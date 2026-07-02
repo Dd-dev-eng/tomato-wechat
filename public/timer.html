@@ -428,6 +428,13 @@ function showAlreadyDone(name, durationMin) {
   statusLabel.textContent = '已完成';
   totalSeconds = durationMin * 60;
   remaining = 0;
+  // 设置 timerStartTime 用于 confirmEnd 正确计算
+  if (urlStartTime) {
+    timerStartTime = parseInt(urlStartTime);
+    serverStartTime = timerStartTime;
+  } else {
+    timerStartTime = Date.now() - totalSeconds * 1000;
+  }
   setup.classList.remove('show');
   timerUI.style.display = 'block';
   btnRow.style.display = ''; // 保留结束按钮
@@ -549,12 +556,28 @@ async function checkServerStatusAndStart(name, durMin, serverTs, remain) {
       // 服务端确认活动仍在进行中，正常开始计时
       startTimer(name, durMin, serverTs, remain);
     } else {
-      // 服务端活动已结束（或被其他活动覆盖），显示已完成
-      showAlreadyDone(name, durMin);
+      // 服务端活动已结束 → 跳转干净 URL，重新初始化回到设置表单
+      window.location.replace('?openid=' + urlOpenid);
     }
   } catch(e) {
-    // 网络错误时，保守处理：显示已完成状态
-    showAlreadyDone(name, durMin);
+    // 网络错误时 → 跳转干净 URL
+    window.location.replace('?openid=' + urlOpenid);
+  }
+}
+
+async function checkIfStillOngoingThenShowDone(name, durMin, serverTs) {
+  try {
+    const res = await fetch('/api/ongoing/' + urlOpenid);
+    const data = await res.json();
+    if (data.ok && data.ongoing && data.ongoing.startTime === serverTs) {
+      // 服务端确认活动仍在进行中，显示已完成待结束
+      showAlreadyDone(name, durMin);
+    } else {
+      // 活动已结束 → 回到设置表单
+      window.location.replace('?openid=' + urlOpenid);
+    }
+  } catch(e) {
+    window.location.replace('?openid=' + urlOpenid);
   }
 }
 
@@ -568,8 +591,12 @@ if (urlName && urlDur && urlStartTime) {
   const remain = Math.max(0, totalSec - elapsed);
 
   if (remain <= 0) {
-    // 时间已到 → 显示已完成状态
-    showAlreadyDone(urlName, durMin);
+    // 时间已到 → 检查服务端：活动还在就显示已完成待结束，已结束则回设置表单
+    if (urlOpenid) {
+      checkIfStillOngoingThenShowDone(urlName, durMin, serverTs);
+    } else {
+      window.location.replace('/timer');
+    }
   } else {
     // 还在进行中 → 检查 localStorage 恢复或重新开始
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -581,8 +608,8 @@ if (urlName && urlDur && urlStartTime) {
       if (urlOpenid) {
         checkServerStatusAndStart(urlName, durMin, serverTs, remain);
       } else {
-        // 无 openid 时无法校验，信任 localStorage 已清除（用户已结束）
-        showAlreadyDone(urlName, durMin);
+        // 无 openid 时无法校验 → 直接回到干净页面显示设置表单
+        window.location.replace('/timer');
       }
     }
   }
