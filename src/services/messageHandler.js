@@ -220,6 +220,20 @@ class MessageHandler {
       return textReply(openid, accountId, '请输入 1-180 之间的数字');
     }
 
+    // 检查是否已有进行中的活动
+    const existing = activityService.getOngoing(openid);
+    if (existing) {
+      await sessionService.update(openid, { step: 'idle' });
+      const min = Math.round((Date.now() - existing.startTime) / 60000);
+      return textReply(openid, accountId,
+        '⏳ 正在专注中\n' +
+        '━━━━━━━━━━━\n' +
+        `📌 ${existing.name}\n` +
+        `⏱ 已进行 ${min} 分钟\n\n` +
+        '完成后回复「结束」记录时长'
+      );
+    }
+
     const session = await sessionService.get(openid);
     const activity = activityService.start(openid, session.tempActivityName, dur);
     await sessionService.update(openid, { step: 'idle' });

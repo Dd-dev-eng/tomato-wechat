@@ -312,10 +312,12 @@ function handleEnd() {
 }
 
 function confirmEnd() {
+  if (activityEnded) return; // 防止重复结束（计时器可能在弹窗期间自然完成）
   overlayConfirm.classList.remove('show');
   activityEnded = true;
   clearInterval(timerId);
   timerId = null;
+  clearState();
   // 通知服务器
   apiEnd();
   // 显示完成弹窗
@@ -407,6 +409,7 @@ function startTimerFrom(name, durationMin, startRemaining, savedOpenid) {
   updateDisplay();
   clearInterval(timerId);
   timerId = setInterval(tick, 1000);
+  saveState(); // 恢复后立即持久化
   // 恢复时不重复调用 apiStart（微信侧已经记录过了）
 }
 
