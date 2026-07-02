@@ -93,7 +93,7 @@ const startServer = async () => {
     reminderService.start();
 
     // 菜单：活动 | 开始/结束 | 倒计时（子菜单含倒计时+记录）
-    const ngrokUrl = 'https://badge-douche-nastiness.ngrok-free.dev';
+    const baseUrl = process.env.SITE_URL || 'https://tomato-wechat-production.up.railway.app';
     const menuConfig = {
       button: [
         { name: '活动', type: 'click', key: 'START_ACTIVITY' },
@@ -101,7 +101,7 @@ const startServer = async () => {
         {
           name: '更多',
           sub_button: [
-            { name: '⏱ 倒计时', type: 'view', url: `${ngrokUrl}/timer` },
+            { name: '⏱ 倒计时', type: 'view', url: `${baseUrl}/timer` },
             { name: '📋 今日记录', type: 'click', key: 'TODAY_RECORD' }
           ]
         }
