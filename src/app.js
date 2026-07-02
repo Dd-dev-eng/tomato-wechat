@@ -17,12 +17,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// XML 消息体解析 - 匹配所有可能的文本 Content-Type
-app.use(bodyParser.text({ 
-  type: ['text/xml', 'application/xml', 'text/plain', '*/*'],
-  limit: '1mb'
-}));
-
 // 静态文件 - H5 页面
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -57,19 +51,31 @@ app.get('/api/timer/status', async (req, res) => {
 
 // --- 微信 ---
 
-// GET 请求处理
-app.get('/wechat', (req, res) => wechatController.verify(req, res));
-
-// POST 请求处理 - 微信消息
-app.post('/wechat', (req, res) => {
-  const xmlData = req.body || '';
-  console.log('收到微信消息，长度:', xmlData.length);
-  if (xmlData.length > 0) {
-    console.log('内容(前200字):', xmlData.substring(0, 200));
-  } else {
-    console.log('警告: 请求体为空！');
+// GET 请求处理（微信服务器验证）
+app.get('/wechat', (req, res) => {
+  try {
+    wechatController.verify(req, res);
+  } catch (e) {
+    console.error('微信验证出错:', e.message);
+    res.status(500).send('error');
   }
-  wechatController.handleMessage(req, res);
+});
+
+// POST 请求处理 - 微信消息（只用 text/plain 和 text/xml）
+app.post('/wechat', bodyParser.text({ type: ['text/xml', 'text/plain'], limit: '1mb' }), (req, res) => {
+  try {
+    const xmlData = req.body || '';
+    console.log('收到微信消息，长度:', xmlData.length, 'CT:', req.get('Content-Type'));
+    if (xmlData.length > 0) {
+      console.log('内容(前200字):', xmlData.substring(0, 200));
+    } else {
+      console.log('警告: 请求体为空！');
+    }
+    wechatController.handleMessage(req, res);
+  } catch (e) {
+    console.error('微信消息处理出错:', e.message);
+    res.send('success');
+  }
 });
 
 // --- 首页 ---
@@ -79,6 +85,14 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 全局错误处理，防止进程崩溃
+process.on('uncaughtException', (err) => {
+  console.error('未捕获异常:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('未处理的 Promise 拒绝:', reason);
 });
 
 // --- 启动 ---
