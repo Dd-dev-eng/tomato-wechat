@@ -8,190 +8,299 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #f7f7f7;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
+    background: #1a1a2e;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; min-height: 100dvh;
+    color: #eee;
   }
   .card {
-    width: 100%;
-    max-width: 360px;
-    background: #fff;
-    border-radius: 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    padding: 32px 24px;
-    text-align: center;
+    width: 100%; max-width: 360px;
+    padding: 40px 24px; text-align: center;
   }
-  .icon { font-size: 40px; margin-bottom: 12px; }
-  .title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
-  .activity-name { font-size: 16px; color: #07c160; font-weight: 600; margin-bottom: 24px; }
 
-  .timer {
-    font-size: 64px;
-    font-weight: 300;
-    color: #1a1a1a;
+  /* 活动名 */
+  .label { font-size: 13px; color: #888; margin-bottom: 4px; }
+  .name { font-size: 20px; font-weight: 600; color: #07c160; margin-bottom: 32px; }
+
+  /* 计时器 */
+  .timer-wrap { position: relative; display: inline-block; margin-bottom: 20px; }
+  .timer-ring {
+    transform: rotate(-90deg);
+    width: 200px; height: 200px;
+  }
+  .timer-ring .bg { fill: none; stroke: #2a2a3e; stroke-width: 6; }
+  .timer-ring .fg {
+    fill: none; stroke: #07c160; stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+  }
+  .timer-text {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 42px; font-weight: 300; letter-spacing: 2px;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 2px;
-    margin-bottom: 16px;
   }
-  .timer.warning {
-    color: #e64340;
-    animation: blink 1s infinite;
-  }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+  .timer-text.warning { color: #e64340; animation: blink 0.6s infinite; }
 
-  .progress-wrap {
-    width: 100%;
-    height: 6px;
-    background: #e8e8e8;
-    border-radius: 3px;
-    margin-bottom: 24px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #07c160, #05a04b);
-    border-radius: 3px;
-    transition: width 1s linear;
-  }
+  /* 信息行 */
+  .info { display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-bottom: 28px; }
+  .info span:last-child { color: #07c160; }
 
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: #999;
-    margin-bottom: 24px;
+  /* 按钮 */
+  .btn-row { display: flex; gap: 12px; justify-content: center; }
+  .btn {
+    border: none; border-radius: 28px; padding: 14px 0; width: 140px;
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;
   }
-
-  .empty-state { display: none; }
-  .empty-state .icon { font-size: 48px; }
-  .empty-state .msg { font-size: 15px; color: #999; line-height: 1.8; margin-top: 8px; }
-  .empty-state .hint { font-size: 13px; color: #bbb; margin-top: 20px; }
-
-  .tip {
-    font-size: 12px;
-    color: #bbb;
-    margin-top: 8px;
+  .btn:active { transform: scale(0.96); }
+  .btn-start { background: #07c160; color: #fff; }
+  .btn-pause { background: #ffc107; color: #1a1a2e; }
+  .btn-reset {
+    background: transparent; color: #888;
+    border: 1.5px solid #444;
   }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* 完成弹窗 */
+  .overlay { display: none; }
+  .overlay.show { display: flex; }
+  .overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    justify-content: center; align-items: center; z-index: 10;
+    animation: fadeIn 0.3s;
+  }
+  .dialog {
+    background: #222; border-radius: 20px; padding: 32px 24px;
+    text-align: center; max-width: 300px; width: 90%;
+  }
+  .dialog .emoji { font-size: 48px; margin-bottom: 12px; }
+  .dialog h2 { font-size: 20px; color: #07c160; margin-bottom: 12px; }
+  .dialog p { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.6; }
+  .dialog .btn { width: 100%; }
+
+  /* 设置表单（无参数时显示） */
+  .setup { display: none; }
+  .setup.show { display: block; }
+  .setup h2 { font-size: 22px; margin-bottom: 24px; color: #07c160; }
+  .field { margin-bottom: 16px; text-align: left; }
+  .field label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #333;
+    border-radius: 10px; background: #2a2a3e; color: #eee; font-size: 16px; outline: none;
+  }
+  .field input:focus { border-color: #07c160; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .preset {
+    padding: 8px 16px; border-radius: 20px; border: 1.5px solid #333;
+    background: transparent; color: #aaa; font-size: 13px; cursor: pointer;
+  }
+  .preset.active { border-color: #07c160; color: #07c160; background: rgba(7,193,96,0.1); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <!-- 倒计时状态 -->
-  <div id="timerState">
-    <div class="icon">🍅</div>
-    <div class="title">主动番茄</div>
-    <div class="activity-name" id="actName">-</div>
-    <div class="timer" id="timerDisplay">00:00</div>
-    <div class="progress-wrap">
-      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+
+  <!-- 设置界面（无 URL 参数时显示） -->
+  <div class="setup" id="setup">
+    <h2>🍅 主动番茄</h2>
+    <div class="field">
+      <label>活动名称</label>
+      <input id="actInput" placeholder="例如：阅读、学习、运动" value="专注">
     </div>
-    <div class="info-row">
-      <span id="elapsedLabel">已过 0 分钟</span>
-      <span id="totalLabel">共 0 分钟</span>
+    <div class="field">
+      <label>时长（分钟）</label>
+      <div class="presets" id="presets">
+        <button class="preset active" data-dur="25">25 分钟</button>
+        <button class="preset" data-dur="40">40 分钟</button>
+        <button class="preset" data-dur="60">60 分钟</button>
+      </div>
+      <input id="durInput" type="number" placeholder="自定义分钟数" value="25" min="1" max="180">
     </div>
-    <div class="tip">回到微信聊天进行操作</div>
+    <button class="btn btn-start" style="width:100%" onclick="startFromSetup()">开始专注 🎯</button>
   </div>
 
-  <!-- 空闲状态 -->
-  <div id="emptyState" class="empty-state">
-    <div class="icon">🍅</div>
-    <div class="msg">
-      当前没有进行中的活动<br>
-      回到微信聊天，<br>
-      选择活动开始专注吧～
+  <!-- 计时界面 -->
+  <div id="timerUI" style="display:none">
+    <div class="label">正在专注</div>
+    <div class="name" id="actName">-</div>
+
+    <div class="timer-wrap">
+      <svg class="timer-ring" viewBox="0 0 120 120">
+        <circle class="bg" cx="60" cy="60" r="54"/>
+        <circle class="fg" id="ring" cx="60" cy="60" r="54"
+          stroke-dasharray="339.292"
+          stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-text" id="timer">00:00</div>
     </div>
-    <div class="hint">本页面会自动刷新</div>
+
+    <div class="info">
+      <span id="elapsed">已过 0 分钟</span>
+      <span id="total">共 0 分钟</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-pause" id="btnPause" onclick="togglePause()">暂停</button>
+      <button class="btn btn-reset" onclick="resetTimer()">重置</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- 完成弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <div class="emoji">🍅</div>
+    <h2>时间到！</h2>
+    <p id="doneMsg">你完成了专注</p>
+    <button class="btn btn-start" onclick="closeOverlay()">好的</button>
   </div>
 </div>
 
 <script>
-const timerState = document.getElementById('timerState');
-const emptyState = document.getElementById('emptyState');
-const timerDisplay = document.getElementById('timerDisplay');
-const actName = document.getElementById('actName');
-const progressFill = document.getElementById('progressFill');
-const elapsedLabel = document.getElementById('elapsedLabel');
-const totalLabel = document.getElementById('totalLabel');
-
+const CIRCUMFERENCE = 2 * Math.PI * 54; // ≈ 339.292
+let totalSeconds = 0;
+let remaining = 0;
 let timerId = null;
-let currentActivity = null;
+let isPaused = false;
+let audioCtx = null;
 
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+// DOM
+const setup = document.getElementById('setup');
+const timerUI = document.getElementById('timerUI');
+const actName = document.getElementById('actName');
+const timerEl = document.getElementById('timer');
+const ring = document.getElementById('ring');
+const elapsedEl = document.getElementById('elapsed');
+const totalEl = document.getElementById('total');
+const btnPause = document.getElementById('btnPause');
+const overlay = document.getElementById('overlay');
+const doneMsg = document.getElementById('doneMsg');
+
+// --- 设置界面 ---
+document.getElementById('presets').addEventListener('click', e => {
+  if (e.target.classList.contains('preset')) {
+    document.querySelectorAll('.preset').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    document.getElementById('durInput').value = e.target.dataset.dur;
+  }
+});
+
+function startFromSetup() {
+  const name = document.getElementById('actInput').value.trim() || '专注';
+  const dur = parseInt(document.getElementById('durInput').value) || 25;
+  startTimer(name, dur);
 }
 
-async function fetchStatus() {
+// --- 计时核心 ---
+function startTimer(name, durationMin) {
+  totalSeconds = durationMin * 60;
+  remaining = totalSeconds;
+  isPaused = false;
+
+  actName.textContent = name;
+  totalEl.textContent = '共 ' + durationMin + ' 分钟';
+
+  setup.classList.remove('show');
+  timerUI.style.display = 'block';
+  btnPause.textContent = '暂停';
+  btnPause.className = 'btn btn-pause';
+
+  ring.style.strokeDasharray = CIRCUMFERENCE;
+  ring.style.strokeDashoffset = '0';
+  ring.style.stroke = '#07c160';
+  timerEl.classList.remove('warning');
+
+  updateDisplay();
+  clearInterval(timerId);
+  timerId = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (isPaused) return;
+  remaining--;
+  updateDisplay();
+  if (remaining <= 0) done();
+}
+
+function updateDisplay() {
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+  timerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+
+  const elapsed = totalSeconds - remaining;
+  const pct = elapsed / totalSeconds;
+  ring.style.strokeDashoffset = CIRCUMFERENCE * pct;
+  elapsedEl.textContent = '已过 ' + Math.floor(elapsed / 60) + ' 分钟';
+
+  if (remaining <= 60 && remaining > 0) {
+    timerEl.classList.add('warning');
+    ring.style.stroke = '#e64340';
+  }
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+  btnPause.textContent = isPaused ? '继续' : '暂停';
+  btnPause.className = isPaused ? 'btn btn-start' : 'btn btn-pause';
+}
+
+function resetTimer() {
+  clearInterval(timerId);
+  timerId = null;
+  timerUI.style.display = 'none';
+  setup.classList.add('show');
+  overlay.classList.remove('show');
+}
+
+function done() {
+  clearInterval(timerId);
+  timerId = null;
+  timerEl.textContent = '00:00';
+  timerEl.classList.add('warning');
+  doneMsg.textContent = '你完成了【' + actName.textContent + '】的专注！';
+  overlay.classList.add('show');
+  playSound();
+}
+
+function closeOverlay() {
+  overlay.classList.remove('show');
+  resetTimer();
+}
+
+// --- 提示音 ---
+function playSound() {
   try {
-    const res = await fetch('/api/timer/status');
-    const data = await res.json();
-
-    if (data.ongoing) {
-      currentActivity = data;
-      renderTimer();
-    } else {
-      currentActivity = null;
-      showEmpty();
-    }
-  } catch (e) {
-    showEmpty();
-  }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(800, audioCtx.currentTime);
+    o.frequency.setValueAtTime(1000, audioCtx.currentTime + 0.15);
+    o.frequency.setValueAtTime(600, audioCtx.currentTime + 0.3);
+    g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    o.start(); o.stop(audioCtx.currentTime + 0.5);
+  } catch(e) {}
 }
 
-function renderTimer() {
-  emptyState.style.display = 'none';
-  timerState.style.display = 'block';
+// --- 初始化：检查 URL 参数 ---
+const params = new URLSearchParams(window.location.search);
+const urlName = params.get('name');
+const urlDur = params.get('duration');
 
-  actName.textContent = currentActivity.name;
-  totalLabel.textContent = '共 ' + currentActivity.plannedDuration + ' 分钟';
-
-  const totalSec = currentActivity.plannedDuration * 60;
-  const startMs = new Date(currentActivity.startTime).getTime();
-
-  function update() {
-    const elapsed = Math.floor((Date.now() - startMs) / 1000);
-    const remaining = Math.max(0, totalSec - elapsed);
-
-    timerDisplay.textContent = formatTime(remaining);
-
-    const pct = Math.min(100, (elapsed / totalSec) * 100);
-    progressFill.style.width = pct + '%';
-
-    elapsedLabel.textContent = '已过 ' + Math.floor(elapsed / 60) + ' 分钟';
-
-    if (remaining <= 60 && remaining > 0) {
-      timerDisplay.classList.add('warning');
-    } else {
-      timerDisplay.classList.remove('warning');
-    }
-
-    if (remaining <= 0) {
-      timerDisplay.textContent = '00:00';
-    }
-  }
-
-  update();
-  if (timerId) clearInterval(timerId);
-  timerId = setInterval(update, 1000);
+if (urlName && urlDur) {
+  startTimer(urlName, parseInt(urlDur));
+} else {
+  setup.classList.add('show');
 }
-
-function showEmpty() {
-  timerState.style.display = 'none';
-  emptyState.style.display = 'block';
-  if (timerId) { clearInterval(timerId); timerId = null; }
-}
-
-// 每3秒轮询一次
-fetchStatus();
-setInterval(fetchStatus, 3000);
 </script>
+
 </body>
 </html>
