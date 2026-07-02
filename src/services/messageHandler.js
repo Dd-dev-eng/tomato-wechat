@@ -94,7 +94,6 @@ class MessageHandler {
       case 'MENU_CUSTOM':  return this.cmdStart(openid, accountId);
       case 'MENU_END':     return this.cmdEnd(openid, accountId);
       case 'MENU_RECORD':  return this.showRecord(openid, accountId);
-      case 'MENU_CLOCK':   return this.showClock(openid, accountId);
       default:             return this.welcome(openid, accountId);
     }
   }

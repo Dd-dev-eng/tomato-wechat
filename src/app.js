@@ -69,6 +69,7 @@ app.get('/wechat', (req, res) => {
 const bodyParser = require('body-parser');
 const messageHandler = require('./services/messageHandler');
 const activityService = require('./services/activityService');
+const axios = require('axios');
 
 app.use(express.json()); // 解析 JSON body
 
@@ -143,8 +144,50 @@ app.get('/api/activities/:openid', (req, res) => {
   res.json({ ok: true, activities: result, total: result.length });
 });
 
+// ========== 时钟直达（微信 OAuth 静默授权） ==========
+app.get('/clock', (req, res) => {
+  const { openid } = req.query;
+  const siteUrl = process.env.SITE_URL || '';
+
+  if (openid) {
+    // 已有 openid，检查进行中活动 → 直接跳转计时器
+    const ongoing = activityService.getOngoing(openid);
+    if (ongoing) {
+      return res.redirect(`${siteUrl}/timer?name=${encodeURIComponent(ongoing.name)}&duration=${ongoing.plannedDuration}&startTime=${ongoing.startTime}&openid=${openid}`);
+    }
+    // 无进行中活动，返回提示页
+    return res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>主动番茄</title><style>body{font-family:-apple-system,sans-serif;background:#1a1a2e;color:#eee;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;text-align:center}.msg{font-size:20px;color:#07c160;margin-bottom:12px}.sub{font-size:14px;color:#888}</style></head><body><div><div class="msg">🕐 没有进行中的活动</div><div class="sub">在聊天框发送「开始」来开启番茄钟</div></div></body></html>`);
+  }
+
+  // 无 openid → 发起 OAuth 静默授权
+  const redirectUri = encodeURIComponent(`${siteUrl}/clock/callback`);
+  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${process.env.WECHAT_APPID}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=clock#wechat_redirect`;
+  res.redirect(authUrl);
+});
+
+// OAuth 回调：换取 openid 后重定向回 /clock
+app.get('/clock/callback', async (req, res) => {
+  const { code } = req.query;
+  const siteUrl = process.env.SITE_URL || '';
+  if (!code) return res.send('授权失败');
+
+  try {
+    const { data } = await axios.get('https://api.weixin.qq.com/sns/oauth2/access_token', {
+      params: {
+        appid: process.env.WECHAT_APPID,
+        secret: process.env.WECHAT_APPSECRET,
+        code,
+        grant_type: 'authorization_code'
+      }
+    });
+    res.redirect(`${siteUrl}/clock?openid=${data.openid}`);
+  } catch (e) {
+    console.error('OAuth回调失败:', e.response?.data || e.message);
+    res.send('授权失败，请重试');
+  }
+});
+
 // ========== 微信菜单创建 ==========
-const axios = require('axios');
 
 async function getAccessToken() {
   const { data } = await axios.get('https://api.weixin.qq.com/cgi-bin/token', {
@@ -184,7 +227,7 @@ async function createMenu() {
           name: '📊 更多',
           sub_button: [
             { type: 'click', name: '📋 今日记录', key: 'MENU_RECORD' },
-            { type: 'click', name: '🕐 时钟', key: 'MENU_CLOCK' }
+            { type: 'view', name: '🕐 时钟', url: `${process.env.SITE_URL}/clock` }
           ]
         }
       ]

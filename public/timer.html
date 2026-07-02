@@ -174,8 +174,10 @@ const CIRCUMFERENCE = 2 * Math.PI * 54;
 let totalSeconds = 0;
 let remaining = 0;
 let timerId = null;
+let overtimeId = null;
+let overtimeSeconds = 0;
 let activityEnded = false;
-let serverStartTime = null; // 服务端记录的开始时间（用于计算真实已过时间）
+let serverStartTime = null;
 let audioCtx = null;
 
 const setup = document.getElementById('setup');
@@ -250,6 +252,7 @@ function startTimer(name, durationMin, serverStartTs, startRemaining) {
   remaining = (startRemaining !== undefined) ? startRemaining : totalSeconds;
   activityEnded = false;
   if (serverStartTs) serverStartTime = serverStartTs;
+  clearInterval(overtimeId); overtimeId = null; overtimeSeconds = 0;
 
   actName.textContent = name;
   totalEl.textContent = '共 ' + durationMin + ' 分钟';
@@ -301,8 +304,13 @@ function updateDisplay() {
 
 // --- 结束按钮 ---
 function handleEnd() {
-  if (remaining <= 0) return;
   if (activityEnded) return;
+  if (remaining <= 0) {
+    // 时间已到或超时，直接结束
+    confirmEnd();
+    return;
+  }
+  // 提前结束，需要确认
   const elapsed = totalSeconds - remaining;
   const elapsedMin = Math.floor(elapsed / 60);
   const totalMin = Math.floor(totalSeconds / 60);
@@ -315,33 +323,58 @@ function confirmEnd() {
   overlayConfirm.classList.remove('show');
   activityEnded = true;
   clearInterval(timerId);
+  clearInterval(overtimeId);
+  overtimeId = null;
   timerId = null;
   clearState();
   apiEnd();
-  const elapsed = totalSeconds - Math.max(0, remaining);
-  const elapsedMin = Math.floor(elapsed / 60);
-  showDoneOverlay('已结束', '🍳', '你提前结束了【' + actName.textContent + '】，实际专注 ' + elapsedMin + ' 分钟');
+  if (remaining > 0) {
+    // 提前结束
+    const elapsed = totalSeconds - remaining;
+    const elapsedMin = Math.floor(elapsed / 60);
+    showDoneOverlay('已结束', '🍳', '你提前结束了【' + actName.textContent + '】，实际专注 ' + elapsedMin + ' 分钟');
+  } else {
+    // 正常完成或超时完成
+    const totalMin = Math.floor(totalSeconds / 60);
+    const extra = overtimeSeconds > 0 ? '（超时 ' + overtimeSeconds + ' 分钟）' : '';
+    showDoneOverlay('已结束', '🍅', '你完成了【' + actName.textContent + '】' + totalMin + ' 分钟！' + extra);
+  }
+  btnRow.style.display = 'none';
 }
 
 function cancelEnd() {
   overlayConfirm.classList.remove('show');
 }
 
-// --- 自然完成 ---
+// --- 时间到（不自动结束，只有用户点结束才记录）---
 function done() {
   clearInterval(timerId);
   timerId = null;
-  activityEnded = true;
   timerEl.textContent = '00:00';
   timerEl.classList.add('warning');
   ring.style.strokeDashoffset = CIRCUMFERENCE;
   ring.style.stroke = '#e64340';
-  elapsedEl.textContent = '已完成';
-  btnRow.style.display = 'none';
   statusLabel.textContent = '已完成';
-  apiEnd();
-  showDoneOverlay('时间到！', '🍅', '你完成了【' + actName.textContent + '】的专注！');
-  clearState();
+  // 不调用 apiEnd(), 不弹窗, 不清除状态
+  // 启动超时计时器
+  overtimeSeconds = 0;
+  overtimeId = setInterval(() => {
+    overtimeSeconds++;
+    updateOvertimeDisplay();
+    saveState();
+  }, 60000);
+  updateOvertimeDisplay();
+  saveState();
+}
+
+function updateOvertimeDisplay() {
+  const m = Math.floor((overtimeSeconds * 60) / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) {
+    elapsedEl.textContent = '已超时 ' + h + ' 小时 ' + (m % 60) + ' 分';
+  } else {
+    elapsedEl.textContent = '已超时 ' + m + ' 分钟';
+  }
 }
 
 function showDoneOverlay(title, emoji, msg) {
@@ -352,28 +385,41 @@ function showDoneOverlay(title, emoji, msg) {
   playSound();
 }
 
-// --- 已完成的时钟（时间已到后点进来的状态） ---
+// --- 已完成的时钟（时间到了但用户还没点结束，显示超时状态）---
 function showAlreadyDone(name, durationMin) {
-  activityEnded = true;
+  clearInterval(overtimeId);
+  activityEnded = false; // 还没手动结束
   actName.textContent = name;
   totalEl.textContent = '共 ' + durationMin + ' 分钟';
   statusLabel.textContent = '已完成';
+  totalSeconds = durationMin * 60;
+  remaining = 0;
   setup.classList.remove('show');
   timerUI.style.display = 'block';
-  btnRow.style.display = 'none'; // 不显示结束按钮
+  btnRow.style.display = ''; // 保留结束按钮
 
   timerEl.textContent = '00:00';
   timerEl.classList.add('warning');
   ring.style.strokeDasharray = CIRCUMFERENCE;
   ring.style.strokeDashoffset = CIRCUMFERENCE;
   ring.style.stroke = '#e64340';
-  elapsedEl.textContent = '已完成';
 
-  doneMsg.textContent = '【' + name + '】' + durationMin + ' 分钟已完成！';
-  document.querySelector('#overlayDone .emoji').textContent = '🍅';
-  doneTitle.textContent = '已完成';
-  overlayDone.classList.add('show');
-  clearState();
+  // 计算超时时间
+  overtimeSeconds = 0;
+  if (urlStartTime) {
+    const serverTs = parseInt(urlStartTime);
+    const totalSec = durationMin * 60;
+    const elapsed = Math.floor((Date.now() - serverTs) / 1000);
+    overtimeSeconds = Math.max(0, Math.floor((elapsed - totalSec) / 60));
+  }
+  // 启动超时计时
+  overtimeId = setInterval(() => {
+    overtimeSeconds++;
+    updateOvertimeDisplay();
+    saveState();
+  }, 60000);
+  updateOvertimeDisplay();
+  saveState();
 }
 
 function closeOverlay() {
@@ -385,14 +431,16 @@ function closeOverlay() {
 // --- 持久化 ---
 const STORAGE_KEY = 'tomato_timer';
 function saveState() {
-  if (remaining <= 0) return;
+  if (activityEnded) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     name: actName.textContent,
     totalSeconds,
     remaining,
     startTime: Date.now() - (totalSeconds - remaining) * 1000,
     serverStartTime: serverStartTime || null,
-    openid: urlOpenid || ''
+    openid: urlOpenid || '',
+    overtimeSeconds,
+    isOvertime: remaining <= 0
   }));
 }
 function clearState() { localStorage.removeItem(STORAGE_KEY); }
@@ -420,6 +468,7 @@ function startTimerFrom(name, durationMin, startRemaining, savedServerTs) {
   remaining = startRemaining;
   activityEnded = false;
   if (savedServerTs) serverStartTime = savedServerTs;
+  clearInterval(overtimeId); overtimeId = null; overtimeSeconds = 0;
 
   actName.textContent = name;
   totalEl.textContent = '共 ' + durationMin + ' 分钟';
@@ -482,14 +531,14 @@ if (urlName && urlDur && urlStartTime) {
 } else {
   // 无参数：检查 localStorage 或显示设置界面
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-  if (saved && saved.remaining > 0) {
+  if (saved) {
     const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
     const remain = Math.max(0, saved.totalSeconds - elapsed);
-    if (remain > 0) {
+    if (saved.isOvertime || remain <= 0) {
+      // 超时状态：显示已完成
+      showAlreadyDone(saved.name, saved.totalSeconds / 60);
+    } else if (remain > 0) {
       startTimerFrom(saved.name, saved.totalSeconds / 60, remain, saved.serverStartTime);
-    } else {
-      clearState();
-      setup.classList.add('show');
     }
   } else {
     setup.classList.add('show');
