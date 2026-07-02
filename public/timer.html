@@ -340,9 +340,23 @@ const urlName = params.get('name');
 const urlDur = params.get('duration');
 
 if (urlName && urlDur) {
-  // URL 有参数：新启动（清除旧状态）
-  clearState();
-  startTimer(urlName, parseInt(urlDur));
+  // URL 有参数：检查是否已有相同参数的计时器在运行
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  if (saved && saved.name === urlName && saved.totalSeconds === parseInt(urlDur) * 60) {
+    // 同一个计时器，恢复继续
+    const elapsed = Math.floor((Date.now() - saved.startTime) / 1000);
+    const remaining = Math.max(0, saved.totalSeconds - elapsed);
+    if (remaining > 0) {
+      startTimerFrom(saved.name, parseInt(urlDur), remaining, saved.isPaused);
+    } else {
+      clearState();
+      setup.classList.add('show');
+    }
+  } else {
+    // 新计时器
+    clearState();
+    startTimer(urlName, parseInt(urlDur));
+  }
 } else {
   // 无参数：检查是否有进行中的计时器
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
