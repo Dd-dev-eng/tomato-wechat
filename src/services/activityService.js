@@ -25,11 +25,16 @@ class ActivityService {
     return activity;
   }
 
-  // 获取今日已完成的活动记录
+  // 获取今日已完成的活动记录（北京时间 0 点结算）
   getTodayActivities(openid) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStart = today.getTime();
+    const now = new Date();
+    // 北京时间 = UTC+8，计算北京时间今天 00:00 对应的 UTC 时间戳
+    const beijingTime = new Date(now.getTime() + 8 * 3600 * 1000);
+    const todayStart = Date.UTC(
+      beijingTime.getUTCFullYear(),
+      beijingTime.getUTCMonth(),
+      beijingTime.getUTCDate()
+    ) - 8 * 3600 * 1000;
     const result = [];
     for (const [, a] of activities) {
       if (a.openid === openid && a.status === 'completed' && a.startTime >= todayStart) {
